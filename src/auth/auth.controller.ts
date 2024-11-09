@@ -63,7 +63,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const refreshToken = req.cookies['refresh_token'];
-    return this.authService.signOut(refreshToken, res);
+    return this.authService.signOutAdmin(refreshToken, res);
   }
 
   //==========================USER AUTH==========================\\
@@ -112,8 +112,4 @@ export class AuthController {
     const refreshToken = req.cookies['refresh_token'];
     return this.authService.signOutUser(refreshToken, res);
   }
-
-  
-
-
 }

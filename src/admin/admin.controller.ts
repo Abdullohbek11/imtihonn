@@ -6,11 +6,15 @@ import {
   Patch,
   Param,
   Delete,
+  // UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
+import { IsCreatorGuard } from 'src/guards/is_creator';
+import { SelfAdminGuard } from 'src/guards/self.Admin.guard';
+import { SelfGuard } from 'src/guards/self.guard';
 
 @ApiTags('admin')
 @Controller('admin')
@@ -25,6 +29,7 @@ export class AdminController {
     return this.adminService.create(createAdminDto);
   }
 
+  // @UseGuards(SelfAdminGuard)
   @Get('getall')
   @ApiOperation({ summary: 'Retrieve a list of all admins' })
   @ApiResponse({
@@ -35,6 +40,7 @@ export class AdminController {
     return this.adminService.findAll();
   }
 
+  // @UseGuards(SelfAdminGuard, SelfGuard)
   @Get('get/:id')
   @ApiOperation({ summary: 'Get details of a specific admin' })
   @ApiParam({
@@ -51,6 +57,7 @@ export class AdminController {
     return this.adminService.findOne(+id);
   }
 
+  // @UseGuards(SelfAdminGuard)
   @Get('email/:email')
   @ApiOperation({ summary: 'Get details of a specific admin by email' })
   @ApiParam({
@@ -66,6 +73,8 @@ export class AdminController {
   findOneByEmail(@Param('email') email: string) {
     return this.adminService.findByEmail(email);
   }
+
+  // @UseGuards(SelfAdminGuard)
   @Get('phone/:phone_number')
   @ApiOperation({ summary: 'Get details of a specific admin by phone number' })
   @ApiParam({
@@ -81,7 +90,8 @@ export class AdminController {
   findOneByPhone(@Param('phone_number') phone_number: string) {
     return this.adminService.findByPhone(phone_number);
   }
-  
+
+  // @UseGuards(SelfGuard, IsCreatorGuard)
   @Patch('update/:id')
   @ApiOperation({ summary: "Update an admin's information" })
   @ApiParam({
@@ -95,6 +105,7 @@ export class AdminController {
     return this.adminService.update(+id, updateAdminDto);
   }
 
+  // @UseGuards(SelfGuard, IsCreatorGuard)
   @Delete('delete/:id')
   @ApiOperation({ summary: 'Delete an admin account' })
   @ApiParam({

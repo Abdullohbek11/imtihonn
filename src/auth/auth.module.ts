@@ -11,7 +11,7 @@ import { AdminModule } from 'src/admin/admin.module';
     UsersModule,
     AdminModule,
     // MailModule,
-    
+
     JwtModule.register({
       global: true,
       secret: 'mysecretkey',

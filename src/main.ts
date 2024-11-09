@@ -4,7 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './logger/eroorhanling';
 import { Logger } from '@nestjs/common';
 import { CustomValidationPipe } from './pipe/validation.pipe';
-import * as cookieParser from 'cookie-parser'; 
+import * as cookieParser from 'cookie-parser';
 async function start() {
   try {
     const PORT = process.env.PORT || 3030;

@@ -59,94 +59,116 @@ export class AuthService {
   async updateRefreshTokenUser(id: number, refreshToken: string) {
     try {
       const hashed_refresh_token = await bcrypt.hash(refreshToken, 10);
-
-      await this.userService.update(id, { hashed_refresh_token });
+      const user = await this.userService.update(id, {
+        hashed_refresh_token,
+      });
+      return user;
     } catch (error) {
-      throw new Error('Refresh tokenni yangilashda xatolik yuz berdi');
+      throw new InternalServerErrorException(
+        'Refresh tokenni yangilashda xatolik yuz berdi',
+      );
     }
+  }
+
+  private setRefreshTokenCookie(res: Response, refreshToken: string) {
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      maxAge: Number(process.env.REFRESH_TIME_MS),
+      secure: true,
+      sameSite: 'strict',
+    });
   }
 
   async signUpUser(createUserDto: CreateUserDto, res: Response) {
-    const candidate = await this.userService.findByEmail(createUserDto.email);
-
-    if (candidate) {
-      throw new BadRequestException('Bunday Foydalnuvchi mavjud');
-    }
-
-    if (createUserDto.password !== createUserDto.confirm_password) {
-      throw new BadRequestException('Parollar mos emas');
-    }
-
-    const hashed_password = await bcrypt.hash(createUserDto.password, 7);
-
-    const newUser = await this.userService.create({
-      ...createUserDto,
-      password: hashed_password,
-      is_active: false,
-      activation_link: uuidv4(),
-    });
-
-    const tokens = await this.generateTokensWithUser(newUser);
-    const hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 10);
-
-    const updatedUser = await this.userService.update(newUser.id, {
-      hashed_refresh_token,
-      activation_link: newUser.activation_link,
-    });
-
-    if (!updatedUser) {
-      throw new InternalServerErrorException(
-        'Foydalanuvchi yangilashda xatolik',
-      );
-    }
-
-    this.setRefreshTokenCookie(res, tokens.refresh_token);
-
-    const response = {
-      message: "Foydalanuvchi muvaffaqiyatli ro'yxatdan o'tdi!",
-      user: updatedUser,
-      access_token: tokens.access_token,
-    };
-
-    return response;
-  }
-
-  async signInUser(signinDto: SignInDto, res: Response) {
     try {
-      const user = await this.userService.findByEmail(signinDto.email);
-
-      if (!user) {
-        throw new BadRequestException("Email yoki parol noto'g'ri");
-      }
-
-      const isPasswordValid = await bcrypt.compare(
-        signinDto.password,
-        user.password,
+      const existingUserByPhone = await this.userService.findByPhone(
+        createUserDto.phone_number,
       );
-      if (!isPasswordValid) {
-        throw new BadRequestException("Email yoki parol noto'g'ri");
+      const existingUserByEmail = await this.userService.findByEmail(
+        createUserDto.email,
+      );
+
+      if (existingUserByPhone) {
+        throw new BadRequestException(
+          "Ushbu telefon raqam allaqachon ro'yxatdan o'tgan",
+        );
       }
 
-      await this.userService.update(user.id, { is_active: true });
+      if (existingUserByEmail) {
+        throw new BadRequestException(
+          "Ushbu email allaqachon ro'yxatdan o'tgan",
+        );
+      }
 
-      const tokens = await this.generateTokensWithUser(user);
-      await this.updateRefreshTokenUser(user.id, tokens.refresh_token);
+      if (createUserDto.password !== createUserDto.confirm_password) {
+        throw new BadRequestException('Parollar bir-biriga mos emas');
+      }
+
+      const hashed_password = await bcrypt.hash(createUserDto.password, 7);
+
+      const newUser = await this.userService.create({
+        ...createUserDto,
+        password: hashed_password,
+        is_active: false,
+        activation_link: uuidv4(),
+      });
+
+      const tokens = await this.generateTokensWithUser(newUser);
+      const hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 10);
+
+      await this.userService.update(newUser.id, { hashed_refresh_token });
       this.setRefreshTokenCookie(res, tokens.refresh_token);
 
       return {
-        message: 'Tizimga muvaffaqiyatli kirildi',
+        message: "Foydalanuvchi muvaffaqiyatli ro'yxatdan o'tdi",
         user: {
-          full_name: user.full_name,
-          email: user.email,
-          is_active: user.is_active,
+          id: newUser.id,
+          full_name: newUser.full_name,
+          email: newUser.email,
+          is_active: newUser.is_active,
         },
         access_token: tokens.access_token,
       };
     } catch (error) {
-      throw new UnauthorizedException(
-        error.message || 'User tizimga kirishda xatolik yuz berdi',
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        "Ro'yxatdan o'tishda kutilmagan xatolik yuz berdi",
       );
     }
+  }
+
+  async signInUser(signInDto: SignInDto, res: Response) {
+    const user = await this.userService.findByEmail(signInDto.email);
+
+    if (!user) {
+      throw new BadRequestException("Login yoki parol noto'g'ri");
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      signInDto.password,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      throw new BadRequestException("Login yoki parol noto'g'ri");
+    }
+
+    if (!user.is_active) {
+      throw new BadRequestException('Akkaunt hali faollashtirilmagan');
+    }
+
+    const tokens = await this.generateTokensWithUser(user);
+    const hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 10);
+
+    await this.userService.update(user.id, { hashed_refresh_token });
+    this.setRefreshTokenCookie(res, tokens.refresh_token);
+
+    return {
+      message: 'Tizimga muvaffaqiyatli kirildi',
+      user,
+      tokens,
+    };
   }
 
   async signOutUser(refreshToken: string, res: Response) {
@@ -155,26 +177,24 @@ export class AuthService {
         secret: process.env.REFRESH_TOKEN_KEY,
       });
 
-      if (!payload || !payload.id) {
-        throw new BadRequestException("Foydalanuvchi verifikatsiyadan o'tmadi");
-      }
-
       const user = await this.userService.findOne(payload.id);
-
       if (!user) {
         throw new BadRequestException('Foydalanuvchi topilmadi');
       }
       await this.userService.update(user.id, {
+        is_active: false,
         hashed_refresh_token: null,
       });
 
       res.clearCookie('refresh_token');
+      const updatedUser = await this.userService.findOne(user.id);
 
       return {
         message: 'Foydalanuvchi tizimdan muvaffaqiyatli chiqdi',
+        is_active: updatedUser.is_active,
       };
     } catch (error) {
-      console.error('SignOut Error:', error);
+      console.error(' Xatolik:', error);
       throw new UnauthorizedException(
         error.message || 'Foydalanuvchi tizimdan chiqishda xatolik yuz berdi',
       );
@@ -213,7 +233,6 @@ export class AuthService {
   async updateRefreshTokenAdmin(id: number, refreshToken: string) {
     try {
       const hashed_refresh_token = await bcrypt.hash(refreshToken, 10);
-
       const admin = await this.adminService.update(id, {
         hashed_refresh_token,
       });
@@ -221,15 +240,6 @@ export class AuthService {
     } catch (error) {
       throw new Error('Refresh tokeni yangilashda xato');
     }
-  }
-
-  private setRefreshTokenCookie(res: Response, refreshToken: string) {
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      maxAge: Number(process.env.REFRESH_TIME_MS),
-      secure: true,
-      sameSite: 'strict',
-    });
   }
 
   async signUpAdmin(createAdminDto: CreateAdminDto, res: Response) {
@@ -323,7 +333,7 @@ export class AuthService {
     }
   }
 
-  async signOut(refreshToken: string, res: Response) {
+  async signOutAdmin(refreshToken: string, res: Response) {
     try {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: process.env.REFRESH_TOKEN_KEY,
@@ -339,9 +349,8 @@ export class AuthService {
         hashed_refresh_token: null,
       });
 
-      const updatedAdmin = await this.adminService.findOne(admin.id);
-
       res.clearCookie('refresh_token');
+      const updatedAdmin = await this.adminService.findOne(admin.id);
 
       return {
         message: 'Admin tizimdan muvaffaqiyatli chiqildi',
