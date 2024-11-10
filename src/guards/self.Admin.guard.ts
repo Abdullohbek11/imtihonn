@@ -4,23 +4,24 @@ import {
   ForbiddenException,
   Injectable,
   UnauthorizedException,
-} from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
-import { Observable } from "rxjs";
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Observable } from 'rxjs';
 
 @Injectable()
 export class SelfAdminGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}
 
   canActivate(
-    context: ExecutionContext
+    context: ExecutionContext,
   ): boolean | Promise<boolean> | Observable<boolean> {
     const req = context.switchToHttp().getRequest();
 
-    if (!req.user || !req.user.sub) {
-      throw new UnauthorizedException(
-        "bunday foydalanuvchi yoki admin mavjud emas"
-      );
+    if (!req.admin) {
+      throw new UnauthorizedException('bunday admin mavjud emas');
+    }
+    if (!req.user) {
+      throw new UnauthorizedException('bunday foydalanuvchi mavjud emas');
     }
 
     const userId = req.user.sub;
@@ -28,7 +29,7 @@ export class SelfAdminGuard implements CanActivate {
 
     if (userId !== adminId) {
       throw new ForbiddenException({
-        message: "Ruxsat etilmagan foydalanuvchi",
+        message: 'Ruxsat etilmagan foydalanuvchi',
       });
     }
 

@@ -24,7 +24,7 @@ async function start() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
 
-    // Exception filters
+    // Exception filters9
     app.useGlobalFilters(new AllExceptionsFilter(new Logger()));
     app.useGlobalPipes(new CustomValidationPipe());
 

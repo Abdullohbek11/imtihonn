@@ -1,3 +1,4 @@
+// Kerakli modullarni import qilish
 import {
   CanActivate,
   ExecutionContext,
