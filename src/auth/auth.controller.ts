@@ -66,6 +66,8 @@ export class AuthController {
     return this.authService.signOutAdmin(refreshToken, res);
   }
 
+  
+
   //==========================USER AUTH==========================\\
 
   @ApiOperation({ summary: 'Foydalanuvchini signup qilish' })

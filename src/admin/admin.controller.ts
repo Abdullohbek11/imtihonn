@@ -105,7 +105,7 @@ export class AdminController {
     return this.adminService.update(+id, updateAdminDto);
   }
 
-  // @UseGuards(SelfGuard, IsCreatorGuard)
+  // @UseGuards( IsCreatorGuard)
   @Delete('delete/:id')
   @ApiOperation({ summary: 'Delete an admin account' })
   @ApiParam({
