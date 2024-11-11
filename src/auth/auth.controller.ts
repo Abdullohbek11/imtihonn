@@ -19,7 +19,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  //==========================USER AUTH==========================\\
+  //==========================ADMIN AUTH==========================\\
 
   @ApiOperation({ summary: "Yangi Admin qo'shish" })
   @ApiResponse({

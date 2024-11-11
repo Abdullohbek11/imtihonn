@@ -139,36 +139,40 @@ export class AuthService {
     }
   }
 
-  async signInUser(signInDto: SignInDto, res: Response) {
-    const user = await this.userService.findByEmail(signInDto.email);
+  async signInUser(signinDto: SignInDto, res: Response) {
+    try {
+      const user = await this.userService.findByEmail(signinDto.email);
+      if (!user) {
+        throw new BadRequestException("Email yoki parol noto'g'ri");
+      }
+      const isPasswordValid = await bcrypt.compare(
+        signinDto.password,
+        user.password,
+      );
+      if (!isPasswordValid) {
+        throw new BadRequestException("Email yoki parol noto'g'ri");
+      }
 
-    if (!user) {
-      throw new BadRequestException("Login yoki parol noto'g'ri");
+      await this.userService.update(user.id, { is_active: true });
+
+      const tokens = await this.generateTokensWithUser(user);
+      await this.updateRefreshTokenAdmin(user.id, tokens.refresh_token);
+      this.setRefreshTokenCookie(res, tokens.refresh_token);
+
+      return {
+        message: 'Tizimga muvaffaqiyatli kirildi',
+        admin: {
+          full_name: user.full_name,
+          email: user.email,
+          is_active: user.is_active,
+        },
+        access_token: tokens.access_token,
+      };
+    } catch (error) {
+      throw new UnauthorizedException(
+        error.message || 'user tizimga kirishda xatolik yuz berdi',
+      );
     }
-
-    const isPasswordValid = await bcrypt.compare(
-      signInDto.password,
-      user.password,
-    );
-    if (!isPasswordValid) {
-      throw new BadRequestException("Login yoki parol noto'g'ri");
-    }
-
-    if (!user.is_active) {
-      throw new BadRequestException('Akkaunt hali faollashtirilmagan');
-    }
-
-    const tokens = await this.generateTokensWithUser(user);
-    const hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 10);
-
-    await this.userService.update(user.id, { hashed_refresh_token });
-    this.setRefreshTokenCookie(res, tokens.refresh_token);
-
-    return {
-      message: 'Tizimga muvaffaqiyatli kirildi',
-      user,
-      tokens,
-    };
   }
 
   async signOutUser(refreshToken: string, res: Response) {
@@ -298,11 +302,9 @@ export class AuthService {
   async signInAdmin(signinDto: SignInDto, res: Response) {
     try {
       const admin = await this.adminService.findByEmail(signinDto.email);
-
       if (!admin) {
         throw new BadRequestException("Email yoki parol noto'g'ri");
       }
-
       const isPasswordValid = await bcrypt.compare(
         signinDto.password,
         admin.password,
